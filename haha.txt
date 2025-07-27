@@ -1,0 +1,701 @@
+// src/lib/validations/story.ts
+import { z } from "zod";
+
+export const createStorySchema = z.object({
+  title: z.string().min(1, "Judul wajib diisi").max(100, "Judul maksimal 100 karakter"),
+  content: z.string().min(1, "Deskripsi wajib diisi").max(1000, "Deskripsi maksimal 1000 karakter"),
+  image: z
+    .instanceof(File)
+    .refine((file) => file.size <= 5 * 1024 * 1024, "Ukuran file maksimal 5MB")
+    .refine(
+      (file) => ["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(file.type),
+      "Format file harus JPEG, PNG, atau WebP"
+    ),
+  latitude: z.number().min(-90).max(90).optional(),
+  longitude: z.number().min(-180).max(180).optional(),
+});
+
+export type CreateStoryFormData = z.infer<typeof createStorySchema>;
+
+// Types untuk API response
+export interface Story {
+  id: number;
+  title: string;
+  content: string;
+  imageUrl: string | null;
+  latitude: number;
+  longitude: number;
+  createdAt: string;
+  user: {
+    id: number;
+    username: string;
+  };
+}
+
+export interface ApiResponse<T = any> {
+  message: string;
+  story?: T;
+  error?: string;
+}
+
+
+// src/lib/api/stories.ts
+import { getToken } from "../token";
+import { BASE_URL } from "../../utils/config";
+import { CreateStoryFormData, Story, ApiResponse } from "../validations/story";
+
+export const storiesApi = {
+  // Get all stories
+  getStories: async (): Promise<Story[]> => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${BASE_URL}/api/stories`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) throw new Error(`HTTP error! ${response.status}`);
+      return await response.json();
+    } catch (err) {
+      console.error("Failed to fetch stories:", err);
+      throw err;
+    }
+  },
+
+  // Create new story - sesuai dengan backend controller
+  createStory: async (data: CreateStoryFormData): Promise<ApiResponse<Story>> => {
+    try {
+      const token = getToken();
+      const formData = new FormData();
+      
+      // Sesuai dengan backend: title, content, latitude, longitude, file (image)
+      formData.append("title", data.title);
+      formData.append("content", data.content);
+      formData.append("image", data.image); // Backend menggunakan req.file untuk ini
+      
+      if (data.latitude !== undefined) {
+        formData.append("latitude", data.latitude.toString());
+      }
+      if (data.longitude !== undefined) {
+        formData.append("longitude", data.longitude.toString());
+      }
+
+      const response = await fetch(`${BASE_URL}/stories`, {
+        method: "POST",
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          // Jangan set Content-Type untuk FormData, browser akan set otomatis
+        },
+        body: formData,
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.message || result.error || "Failed to create story");
+      }
+
+      return result;
+    } catch (err) {
+      console.error("Failed to create story:", err);
+      throw err;
+    }
+  },
+
+  // Delete story
+  deleteStory: async (id: number): Promise<ApiResponse> => {
+    try {
+      const token = getToken();
+      const response = await fetch(`${BASE_URL}/stories/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.message || result.error || "Gagal menghapus story");
+      }
+      return result;
+    } catch (err) {
+      console.error("Failed to delete story:", err);
+      throw err;
+    }
+  },
+};
+
+
+// src/components/ui/camera.tsx
+'use client';
+
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { Button } from './button';
+import { Card } from './card';
+import { Camera, CameraOff, RotateCcw, Upload } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+interface CameraComponentProps {
+  onPhotoCapture: (file: File) => void;
+  className?: string;
+}
+
+export default function CameraComponent({ onPhotoCapture, className }: CameraComponentProps) {
+  const [isStreamActive, setIsStreamActive] = useState(false);
+  const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+  const [availableDevices, setAvailableDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+  
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Get available cameras
+  const getAvailableDevices = useCallback(async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      setAvailableDevices(videoDevices);
+      
+      if (videoDevices.length > 0 && !selectedDeviceId) {
+        setSelectedDeviceId(videoDevices[0].deviceId);
+      }
+    } catch (err) {
+      console.error('Error getting devices:', err);
+      setError('Tidak dapat mengakses daftar kamera');
+    }
+  }, [selectedDeviceId]);
+
+  // Start camera stream
+  const startCamera = useCallback(async () => {
+    try {
+      setError(null);
+      
+      const constraints: MediaStreamConstraints = {
+        video: {
+          deviceId: selectedDeviceId ? { exact: selectedDeviceId } : undefined,
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: selectedDeviceId ? undefined : 'environment'
+        }
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      streamRef.current = stream;
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        setIsStreamActive(true);
+      }
+    } catch (err) {
+      console.error('Error accessing camera:', err);
+      setError('Tidak dapat mengakses kamera. Pastikan browser memiliki izin kamera.');
+    }
+  }, [selectedDeviceId]);
+
+  // Stop camera stream
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setIsStreamActive(false);
+  }, []);
+
+  // Capture photo from video stream
+  const capturePhoto = useCallback(() => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const context = canvas.getContext('2d');
+    
+    if (!context) return;
+
+    // Set canvas size to match video
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    // Draw video frame to canvas
+    context.drawImage(video, 0, 0);
+    
+    // Convert to blob and create file
+    canvas.toBlob((blob) => {
+      if (blob) {
+        const file = new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
+        onPhotoCapture(file);
+        
+        // Show preview
+        const photoURL = URL.createObjectURL(blob);
+        setCapturedPhoto(photoURL);
+        
+        // Stop camera after capture
+        stopCamera();
+      }
+    }, 'image/jpeg', 0.8);
+  }, [onPhotoCapture, stopCamera]);
+
+  // Handle file upload
+  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      onPhotoCapture(file);
+      
+      // Show preview
+      const photoURL = URL.createObjectURL(file);
+      setCapturedPhoto(photoURL);
+    }
+  }, [onPhotoCapture]);
+
+  // Retake photo
+  const retakePhoto = useCallback(() => {
+    setCapturedPhoto(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, []);
+
+  // Initialize component
+  useEffect(() => {
+    getAvailableDevices();
+    
+    return () => {
+      stopCamera();
+      if (capturedPhoto) {
+        URL.revokeObjectURL(capturedPhoto);
+      }
+    };
+  }, [getAvailableDevices, stopCamera, capturedPhoto]);
+
+  return (
+    <Card className={cn("p-4", className)}>
+      <div className="space-y-4">
+        {/* Camera Selection */}
+        {availableDevices.length > 1 && (
+          <select 
+            value={selectedDeviceId}
+            onChange={(e) => setSelectedDeviceId(e.target.value)}
+            className="w-full p-2 border rounded-md"
+            disabled={isStreamActive}
+          >
+            {availableDevices.map((device) => (
+              <option key={device.deviceId} value={device.deviceId}>
+                {device.label || `Kamera ${device.deviceId.slice(0, 8)}`}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="p-3 bg-red-100 border border-red-300 rounded-md text-red-700 text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Video Preview */}
+        {isStreamActive && (
+          <div className="relative">
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              className="w-full max-w-md mx-auto rounded-lg"
+            />
+          </div>
+        )}
+
+        {/* Captured Photo Preview */}
+        {capturedPhoto && (
+          <div className="relative">
+            <img
+              src={capturedPhoto}
+              alt="Foto yang diambil"
+              className="w-full max-w-md mx-auto rounded-lg"
+            />
+          </div>
+        )}
+
+        {/* Hidden canvas for photo capture */}
+        <canvas ref={canvasRef} className="hidden" />
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+
+        {/* Control Buttons */}
+        <div className="flex flex-wrap gap-2 justify-center">
+          {!capturedPhoto && (
+            <>
+              <Button
+                type="button"
+                variant={isStreamActive ? "destructive" : "default"}
+                onClick={isStreamActive ? stopCamera : startCamera}
+                className="flex items-center gap-2"
+              >
+                {isStreamActive ? <CameraOff size={16} /> : <Camera size={16} />}
+                {isStreamActive ? 'Tutup Kamera' : 'Buka Kamera'}
+              </Button>
+
+              {isStreamActive && (
+                <Button
+                  type="button"
+                  onClick={capturePhoto}
+                  className="flex items-center gap-2"
+                >
+                  <Camera size={16} />
+                  Ambil Gambar
+                </Button>
+              )}
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex items-center gap-2"
+              >
+                <Upload size={16} />
+                Upload File
+              </Button>
+            </>
+          )}
+
+          {capturedPhoto && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={retakePhoto}
+              className="flex items-center gap-2"
+            >
+              <RotateCcw size={16} />
+              Ambil Ulang
+            </Button>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+
+// src/components/ui/map-selector.tsx
+'use client';
+
+import dynamic from 'next/dynamic';
+import { useEffect, useRef, useCallback, useState } from 'react';
+import { Card } from './card';
+import { MapPin } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import type { Map as LeafletMap, Marker as LeafletMarker } from 'leaflet';
+
+interface MapSelectorProps {
+  onLocationSelect: (lat: number, lng: number) => void;
+  className?: string;
+  initialLat?: number;
+  initialLng?: number;
+}
+
+// Dynamic import untuk komponen peta
+const MapContainer = dynamic(() => import('react-leaflet').then(m => m.MapContainer), { 
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-[400px] bg-gray-100 rounded-lg flex items-center justify-center">
+      <div className="text-gray-500">Memuat peta...</div>
+    </div>
+  )
+});
+const TileLayer = dynamic(() => import('react-leaflet').then(m => m.TileLayer), { ssr: false });
+
+export default function MapSelector({ 
+  onLocationSelect, 
+  className, 
+  initialLat = -6.200000, 
+  initialLng = 106.816666 
+}: MapSelectorProps) {
+  const mapRef = useRef<LeafletMap | null>(null);
+  const markerRef = useRef<LeafletMarker | null>(null);
+  const [L, setL] = useState<typeof import('leaflet') | null>(null);
+  const [locationName, setLocationName] = useState<string>('Jakarta, Indonesia');
+  const [coordinates, setCoordinates] = useState({ lat: initialLat, lng: initialLng });
+
+  // Load leaflet hanya di browser
+  useEffect(() => {
+    import('leaflet').then((leaflet) => {
+      setL(leaflet);
+      
+      // Fix default markers icon issue
+      delete (leaflet.Icon.Default.prototype as any)._getIconUrl;
+      leaflet.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+        iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+      });
+    });
+  }, []);
+
+  // Reverse geocoding untuk mendapatkan nama lokasi
+  const getLocationName = useCallback(async (lat: number, lng: number) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=id`
+      );
+      const data = await response.json();
+      
+      if (data.display_name) {
+        setLocationName(data.display_name);
+      }
+    } catch (error) {
+      console.error('Error getting location name:', error);
+      setLocationName(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+    }
+  }, []);
+
+  // Setup map dan marker
+  const setupMap = useCallback((map: LeafletMap) => {
+    if (!L) return;
+    
+    mapRef.current = map;
+    
+    // Buat marker awal
+    const marker = L.marker([initialLat, initialLng], { draggable: true })
+      .addTo(map)
+      .bindPopup('Klik pada peta atau drag marker untuk pilih lokasi')
+      .openPopup();
+    
+    markerRef.current = marker;
+    
+    // Event handler untuk klik peta
+    map.on('click', (e) => {
+      const { lat, lng } = e.latlng;
+      marker.setLatLng([lat, lng]);
+      setCoordinates({ lat, lng });
+      onLocationSelect(lat, lng);
+      getLocationName(lat, lng);
+    });
+    
+    // Event handler untuk drag marker
+    marker.on('dragend', () => {
+      const { lat, lng } = marker.getLatLng();
+      setCoordinates({ lat, lng });
+      onLocationSelect(lat, lng);
+      getLocationName(lat, lng);
+    });
+    
+    // Set initial location name
+    getLocationName(initialLat, initialLng);
+    onLocationSelect(initialLat, initialLng);
+  }, [L, initialLat, initialLng, onLocationSelect, getLocationName]);
+
+  // Get user's current location
+  const getCurrentLocation = useCallback(() => {
+    if (!navigator.geolocation) {
+      alert('Geolocation tidak didukung oleh browser ini');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        
+        if (mapRef.current && markerRef.current && L) {
+          mapRef.current.setView([lat, lng], 15);
+          markerRef.current.setLatLng([lat, lng]);
+          setCoordinates({ lat, lng });
+          onLocationSelect(lat, lng);
+          getLocationName(lat, lng);
+        }
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+        alert('Tidak dapat mengakses lokasi. Pastikan browser memiliki izin lokasi.');
+      }
+    );
+  }, [L, onLocationSelect, getLocationName]);
+
+  return (
+    <Card className={cn("p-4", className)}>
+      <div className="space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <MapPin className="h-5 w-5 text-blue-600" />
+            <h3 className="font-semibold">Pilih Lokasi</h3>
+          </div>
+          <button
+            type="button"
+            onClick={getCurrentLocation}
+            className="text-sm text-blue-600 hover:text-blue-800 underline"
+          >
+            Gunakan Lokasi Saya
+          </button>
+        </div>
+
+        {/* Map Container */}
+        <div className="w-full h-[400px] rounded-lg overflow-hidden border">
+          {L && (
+            <MapContainer
+              center={[initialLat, initialLng]}
+              zoom={13}
+              style={{ height: '100%', width: '100%' }}
+              ref={setupMap}
+            >
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              />
+            </MapContainer>
+          )}
+        </div>
+
+        {/* Location Info */}
+        <div className="space-y-2">
+          <div className="text-sm text-gray-600">
+            <strong>Lokasi Terpilih:</strong>
+          </div>
+          <div className="text-sm bg-gray-50 p-2 rounded border">
+            {locationName}
+          </div>
+          <div className="text-xs text-gray-500">
+            Koordinat: {coordinates.lat.toFixed(6)}, {coordinates.lng.toFixed(6)}
+          </div>
+        </div>
+
+        <div className="text-xs text-gray-500">
+          💡 Tips: Klik pada peta atau drag marker untuk mengubah lokasi
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+
+ini adalah contoh form yg saya bilang barusan.
+saya ingin mengimplementasi teknologi ini 
+"React Hook Form + Zod + shadcn/ui + Tailwind CSS"  ke form saya 
+
+// src\app\stories
+export default function CreateStoryPage() {
+    return (
+        <div className="flex items-center justify-center h-screen">
+            <h1 className="text-sm font-bold">Create Story Page</h1> 
+        </div>
+    );
+}
+
+Detail / informasi perintah :
+itukan project lama dengan masih menggunakan vanilla js. (add-story.js)
+saya sekarng menggunakan typescript.
+saya juga ada API untuk addstory baru.
+dan penggunaan map (map ini saya gunakan di halaman home)
+disana kan ada component camera saya belum buat itu.
+saya juga tidak menerapkan lagi presenter yah.
+ Cek apakan penggunaan fetch addStory sudah benar belum dengan api backend saya ini :
+(seharusnya sudah) karena kan akan di gunakan sekarang saya ingin langsung jadi tidak ada error karena tidak sesuai dengan backend nya gituh.
+import prisma from "../prismaClient.js";
+import supabase from "../supabaseClient.js";
+
+export const getAllStories = async (req, res) => {
+    try {
+        const stories = await prisma.story.findMany({
+            include: { user: { select: { id: true, username: true } } },
+            orderBy: { createdAt: "desc" }
+        });
+        res.json(stories);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+export const getStoryById = async (req, res) => {
+    const { id } = req.params;
+    try {
+        const story = await prisma.story.findUnique({
+            where: { id: Number(id) },
+            include: { user: { select: { id: true, username: true } } }
+        });
+        if (!story) return res.status(404).json({ message: "Cerita tidak ditemukan" });
+        res.json(story);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+export const createStory = async (req, res) => {
+    const { title, content, latitude, longitude } = req.body;
+    const userId = req.user.userId;
+    const file = req.file;
+
+    try {
+        let imageUrl = null;
+
+        // 🔥 Jika file dikirim, upload ke Supabase
+        if (file) {
+            const fileName = ${Date.now()}-${file.originalname};
+            const { error: uploadError } = await supabase
+                .storage
+                .from("d-story-images")
+                .upload(fileName, file.buffer, {
+                    contentType: file.mimetype,
+                    upsert: true,
+                });
+
+            if (uploadError) throw uploadError;
+
+            // 🔗 Dapatkan URL publik
+            const { data: publicData } = supabase
+                .storage
+                .from("d-story-images")
+                .getPublicUrl(fileName);
+
+            imageUrl = publicData.publicUrl;
+        }
+
+        // 📝 Simpan ke PostgreSQL
+        const story = await prisma.story.create({
+            data: {
+                title,
+                content,
+                imageUrl,
+                latitude: parseFloat(latitude),
+                longitude: parseFloat(longitude),
+                userId,
+            },
+        });
+
+        res.status(201).json({ message: "Cerita berhasil ditambahkan", story });
+    } catch (err) {
+        console.error("Error tambah story:", err.message);
+        res.status(500).json({ message: "Gagal menambahkan cerita", error: err.message });
+    }
+};
+
+export const deleteStory = async (req, res) => {
+    const { id } = req.params;
+    try {
+        await prisma.story.delete({ where: { id: Number(id) } });
+        res.json({ message: "Cerita berhasil dihapus" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+export const updateStory = async (req, res) => {
+    const { id } = req.params;
+    const { title, content, image, latitude, longitude } = req.body;
+    try {
+        const updated = await prisma.story.update({
+            where: { id: Number(id) },
+            data: { title, content, image, latitude: parseFloat(latitude), longitude: parseFloat(longitude) }
+        });
+        res.json({ message: "Cerita berhasil diperbarui", story: updated });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
