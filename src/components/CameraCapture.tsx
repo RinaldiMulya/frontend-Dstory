@@ -1,9 +1,15 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 interface CameraCaptureProps {
     onCapture: (file: File, dataUrl: string) => void;
@@ -16,152 +22,93 @@ interface CameraDevice {
     label: string;
 }
 
-export default function CameraCapture({ onCapture, disabled, onCameraStateChange }: CameraCaptureProps) {
-    const [isStreamActive, setIsStreamActive] = useState(false);
-    const [availableCameras, setAvailableCameras] = useState<CameraDevice[]>([]);
-    const [selectedCamera, setSelectedCamera] = useState<string>('');
-    const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [isCaptured, setIsCaptured] = useState(false);
-    const [permissionDenied, setPermissionDenied] = useState(false);
-
+export default function CameraCapture({
+    onCapture,
+    disabled,
+    onCameraStateChange,
+}: CameraCaptureProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const streamRef = useRef<MediaStream | null>(null);
 
-    // Get available cameras
+    const [availableCameras, setAvailableCameras] = useState<CameraDevice[]>([]);
+    const [selectedCamera, setSelectedCamera] = useState<string>('');
+    const [isStreamActive, setIsStreamActive] = useState(false);
+    const [isCaptured, setIsCaptured] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
+    const [permissionDenied, setPermissionDenied] = useState(false);
+
+    // Get available cameras on mount
     useEffect(() => {
-        const getCameras = async () => {
-            console.log('🔍 Starting camera detection...');
+        const detectCameras = async () => {
             try {
-                // Request permission first
-                console.log('📱 Requesting camera permission...');
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                console.log('✅ Camera permission granted:', stream);
+                const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                tempStream.getTracks().forEach(track => track.stop());
 
-                // Stop the test stream immediately
-                stream.getTracks().forEach(track => {
-                    console.log('🛑 Stopping test track:', track.label);
-                    track.stop();
-                });
-
-                console.log('🔍 Enumerating devices...');
                 const devices = await navigator.mediaDevices.enumerateDevices();
-                console.log('📱 All devices:', devices);
-
                 const cameras = devices
                     .filter(device => device.kind === 'videoinput')
-                    .map((device, index) => ({
-                        deviceId: device.deviceId,
-                        label: device.label || `Camera ${index + 1}`
+                    .map((d, i) => ({
+                        deviceId: d.deviceId,
+                        label: d.label || `Camera ${i + 1}`,
                     }));
 
-                console.log('📷 Available cameras:', cameras);
                 setAvailableCameras(cameras);
-
-                if (cameras.length > 0) {
-                    setSelectedCamera(cameras[0].deviceId);
-                    console.log('✅ Selected default camera:', cameras[0]);
-                }
+                setSelectedCamera(cameras[0]?.deviceId || '');
                 setPermissionDenied(false);
-                setError(null);
             } catch (err) {
-                console.error('❌ Error getting cameras:', err);
+                console.error('Camera permission error:', err);
                 setPermissionDenied(true);
-                setError('Kamera ditolak aktif, Anda dapat mengupload gambarnya secara manual.');
+                setError('Izin kamera ditolak. Anda bisa unggah manual.');
                 onCameraStateChange?.(false);
             }
         };
 
-        getCameras();
+        detectCameras();
     }, [onCameraStateChange]);
 
-    // Start camera stream
-    const startCamera = async (cameraId?: string) => {
-        const targetCameraId = cameraId || selectedCamera;
-        console.log('🚀 Starting camera with ID:', targetCameraId);
-        
-        if (!targetCameraId) {
-            setError('Tidak ada kamera yang tersedia');
-            return;
-        }
+    // Start streaming
+    const startCamera = async (cameraId = selectedCamera) => {
+        if (!cameraId) return;
 
         try {
             setIsLoading(true);
-            setError(null);
+            stopCamera();
 
-            // Stop existing stream
-            if (streamRef.current) {
-                console.log('🛑 Stopping existing stream');
-                streamRef.current.getTracks().forEach(track => track.stop());
-                streamRef.current = null;
-            }
-
-            const constraints: MediaStreamConstraints = {
+            const stream = await navigator.mediaDevices.getUserMedia({
                 video: {
-                    deviceId: { exact: targetCameraId },
-                    width: { ideal: 1280, max: 1920 },
-                    height: { ideal: 720, max: 1080 }
-                }
-            };
-
-            console.log('📝 Camera constraints:', constraints);
-            const stream = await navigator.mediaDevices.getUserMedia(constraints);
-            console.log('✅ Got camera stream:', stream);
-            console.log('📊 Stream tracks:', stream.getTracks());
+                    deviceId: { exact: cameraId },
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                },
+            });
 
             streamRef.current = stream;
 
-            if (videoRef.current) {
-                console.log('📺 Setting video srcObject...');
-                videoRef.current.srcObject = stream;
-
-                // Force video to load and play
-                videoRef.current.onloadedmetadata = async () => {
-                    console.log('📺 Video metadata loaded');
-                    console.log('📏 Video dimensions:', {
-                        videoWidth: videoRef.current?.videoWidth,
-                        videoHeight: videoRef.current?.videoHeight
-                    });
-
-                    try {
-                        if (videoRef.current) {
-                            await videoRef.current.play();
-                            console.log('✅ Video playing successfully');
-                            setIsStreamActive(true);
-                            setIsCaptured(false);
-                            onCameraStateChange?.(true);
-                        }
-                    } catch (playError) {
-                        console.error('❌ Error playing video:', playError);
-                        setError('Gagal memutar video kamera');
-                        onCameraStateChange?.(false);
-                    }
-                };
-
-                // Add additional event listeners for debugging
-                videoRef.current.oncanplay = () => console.log('📺 Video can play');
-                videoRef.current.onplaying = () => console.log('📺 Video is playing');
-                videoRef.current.onerror = (e) => console.error('📺 Video error:', e);
-
-                // Ensure video element is ready
-                if (videoRef.current.readyState >= 2) {
-                    // Metadata is loaded, try to play
+            // Delay untuk memastikan ref ter-render
+            setTimeout(async () => {
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
                     try {
                         await videoRef.current.play();
-                        console.log('✅ Video started (readyState check)');
                         setIsStreamActive(true);
                         setIsCaptured(false);
+                        setError(null);
                         onCameraStateChange?.(true);
                     } catch (playError) {
-                        console.log('⚠️ Play failed on readyState check:', playError);
+                        console.warn('Autoplay error:', playError);
+                        setError('Klik video untuk mulai streaming.');
+                        videoRef.current.addEventListener('click', () => {
+                            videoRef.current?.play();
+                        });
                     }
                 }
-            }
-
+            }, 100);
         } catch (err) {
-            console.error('❌ Error starting camera:', err);
-            setError('Gagal membuka kamera. Silakan gunakan upload manual.');
+            console.error('Failed to start camera:', err);
+            setError('Gagal membuka kamera.');
             setPermissionDenied(true);
             onCameraStateChange?.(false);
         } finally {
@@ -169,17 +116,9 @@ export default function CameraCapture({ onCapture, disabled, onCameraStateChange
         }
     };
 
-    // Stop camera stream
     const stopCamera = () => {
-        console.log('🛑 Stopping camera');
-        
-        if (streamRef.current) {
-            streamRef.current.getTracks().forEach(track => {
-                console.log('🛑 Stopping track:', track.label);
-                track.stop();
-            });
-            streamRef.current = null;
-        }
+        streamRef.current?.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
 
         if (videoRef.current) {
             videoRef.current.srcObject = null;
@@ -190,96 +129,55 @@ export default function CameraCapture({ onCapture, disabled, onCameraStateChange
         onCameraStateChange?.(false);
     };
 
-    // Capture photo
     const capturePhoto = () => {
-        console.log('📸 Attempting to capture photo');
-        
-        if (!videoRef.current || !canvasRef.current) {
-            console.error('❌ Video or canvas ref not available');
-            return;
-        }
+        if (!videoRef.current || !canvasRef.current) return;
 
-        if (!isStreamActive || !streamRef.current) {
-            console.error('❌ Camera stream not active');
-            setError('Kamera tidak aktif. Silakan buka kamera terlebih dahulu.');
-            return;
-        }
 
         const video = videoRef.current;
         const canvas = canvasRef.current;
-        const context = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
 
-        if (!context) {
-            console.error('❌ Cannot get canvas context');
-            return;
-        }
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
 
-        // Check if video has valid dimensions
-        if (video.videoWidth === 0 || video.videoHeight === 0) {
-            console.error('❌ Video has no dimensions');
-            setError('Video belum siap. Tunggu sebentar dan coba lagi.');
-            return;
-        }
+        ctx.save();
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+        ctx.restore();
 
-        console.log('📏 Capturing with dimensions:', {
+        setImageSize({
             width: video.videoWidth,
             height: video.videoHeight
         });
 
-        // Set canvas size to match video
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
 
-        // Draw video frame to canvas (flip horizontally for selfie effect)
-        context.save();
-        context.scale(-1, 1);
-        context.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
-        context.restore();
-
-        // Convert to blob and file
-        canvas.toBlob((blob) => {
+        canvas.toBlob(blob => {
             if (blob) {
-                const file = new File([blob], `photo-${Date.now()}.jpg`, {
-                    type: 'image/jpeg'
-                });
+                const file = new File([blob], `photo-${Date.now()}.jpg`, { type: 'image/jpeg' });
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-
-                console.log('✅ Photo captured successfully', {
-                    fileSize: blob.size,
-                    fileName: file.name
-                });
-
                 onCapture(file, dataUrl);
                 setIsCaptured(true);
                 stopCamera();
-            } else {
-                console.error('❌ Failed to create blob from canvas');
-                setError('Gagal mengambil foto. Silakan coba lagi.');
             }
         }, 'image/jpeg', 0.8);
     };
 
-    // Retake photo
     const retakePhoto = () => {
         setIsCaptured(false);
-        setError(null);
         startCamera();
     };
 
-    // Switch camera
     const switchCamera = (cameraId: string) => {
-        console.log('🔄 Switching to camera:', cameraId);
         setSelectedCamera(cameraId);
         if (isStreamActive) {
             stopCamera();
-            setTimeout(() => startCamera(cameraId), 100);
+            setTimeout(() => startCamera(cameraId), 300);
         }
     };
 
-    // Cleanup on unmount
     useEffect(() => {
         return () => {
-            console.log('🧹 Cleaning up camera component');
             stopCamera();
         };
     }, []);
@@ -288,9 +186,8 @@ export default function CameraCapture({ onCapture, disabled, onCameraStateChange
         <Card>
             <CardContent className="p-4">
                 <div className="space-y-4">
-                    {/* Camera Controls */}
-                    <div className="flex items-center gap-3 flex-wrap">
-                        {/* Camera Selector */}
+                    {/* Camera controls */}
+                    <div className="flex flex-wrap gap-3 items-center">
                         {availableCameras.length > 1 && !permissionDenied && (
                             <Select
                                 value={selectedCamera}
@@ -301,140 +198,71 @@ export default function CameraCapture({ onCapture, disabled, onCameraStateChange
                                     <SelectValue placeholder="Pilih kamera" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {availableCameras.map((camera) => (
-                                        <SelectItem key={camera.deviceId} value={camera.deviceId}>
-                                            {camera.label}
+                                    {availableCameras.map((cam) => (
+                                        <SelectItem key={cam.deviceId} value={cam.deviceId}>
+                                            {cam.label}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         )}
 
-                        {/* Start/Stop Camera Button */}
                         {!permissionDenied && (
                             <Button
                                 type="button"
-                                variant={isStreamActive ? "destructive" : "default"}
-                                onClick={isStreamActive ? stopCamera : () => startCamera()}
-                                disabled={disabled || isLoading || availableCameras.length === 0}
+                                onClick={() => (isStreamActive ? stopCamera() : startCamera())}
+                                disabled={disabled || isLoading}
+                                variant={isStreamActive ? 'destructive' : 'default'}
                             >
-                                {isLoading ? (
-                                    '⏳ Loading...'
-                                ) : isStreamActive ? (
-                                    '⏹️ Tutup Kamera'
-                                ) : (
-                                    '📷 Buka Kamera'
-                                )}
+                                {isStreamActive ? '⛔ Tutup Kamera' : '📷 Buka Kamera'}
                             </Button>
                         )}
 
-                        {/* Capture Button */}
                         {isStreamActive && (
-                            <Button
-                                type="button"
-                                onClick={capturePhoto}
-                                disabled={disabled}
-                                className="bg-blue-600 hover:bg-blue-700"
-                            >
+                            <Button onClick={capturePhoto} disabled={disabled}>
                                 📸 Ambil Foto
                             </Button>
                         )}
 
-                        {/* Retake Button */}
                         {isCaptured && (
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={retakePhoto}
-                                disabled={disabled}
-                            >
+                            <Button variant="outline" onClick={retakePhoto} disabled={disabled}>
                                 🔄 Ambil Ulang
                             </Button>
                         )}
                     </div>
 
-                    {/* Error Message */}
+                    {/* Error */}
                     {error && (
-                        <div className={`p-3 border rounded-lg ${permissionDenied
-                            ? 'bg-yellow-50 border-yellow-200'
-                            : 'bg-red-50 border-red-200'
-                            }`}>
-                            <p className={`text-sm ${permissionDenied
-                                ? 'text-yellow-800'
-                                : 'text-red-800'
-                                }`}>
-                                {permissionDenied ? '⚠️' : '❌'} {error}
-                            </p>
+                        <div className="p-3 bg-red-50 border border-red-200 rounded text-sm text-red-800">
+                            ❗ {error}
                         </div>
                     )}
 
-                    {/* Camera Stream */}
-                    {isStreamActive && !permissionDenied && (
-                        <div className="relative bg-black rounded-lg overflow-hidden">
-                            <video
-                                ref={videoRef}
-                                autoPlay
-                                playsInline
-                                muted
-                                className="w-full max-w-md mx-auto block aspect-video object-cover"
-                                style={{ 
-                                    transform: 'scaleX(-1)',
-                                    minHeight: '200px'
-                                }}
-                                onError={(e) => {
-                                    console.error('📺 Video element error:', e);
-                                    setError('Error pada video player');
-                                }}
-                            />
-
-                            {/* Capture Overlay */}
-                            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
-                                <Button
-                                    type="button"
-                                    size="lg"
-                                    onClick={capturePhoto}
-                                    disabled={disabled}
-                                    className="rounded-full w-16 h-16 bg-white border-4 border-gray-300 hover:border-blue-500 text-2xl shadow-lg"
-                                >
-                                    📷
-                                </Button>
-                            </div>
-
-                            {/* Camera Status Indicator */}
-                            <div className="absolute top-2 right-2 bg-red-500 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
-                                <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                                LIVE
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Hidden Canvas for Capture */}
-                    <canvas
-                        ref={canvasRef}
-                        style={{ display: 'none' }}
-                    />
-
-                    {/* Instructions */}
-                    {!isStreamActive && !error && !permissionDenied && (
-                        <div className="text-center p-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                            <div className="text-4xl mb-2">📷</div>
-                            <p className="text-gray-600">
-                                Klik &quot;Buka Kamera&quot; untuk mulai mengambil foto
-                            </p>
-                            {availableCameras.length === 0 && (
-                                <p className="text-sm text-gray-500 mt-2">
-                                    Pastikan browser memiliki akses ke kamera
-                                </p>
-                            )}
-                        </div>
-                    )}
+                    {/* Video Preview */}
+                    <div className="relative bg-black rounded-lg overflow-hidden min-h-[200px]">
+                        <video
+                            ref={videoRef}
+                            autoPlay
+                            muted
+                            playsInline
+                            className={`w-full object-cover aspect-video transition-opacity duration-300 ${isStreamActive ? 'opacity-100' : 'opacity-0'
+                                }`}
+                            style={{ transform: 'scaleX(-1)' }}
+                        />
+                        <canvas ref={canvasRef} className="hidden" />
+                    </div>
 
                     {/* Success Message */}
                     {isCaptured && (
-                        <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
-                            <p className="text-green-800 text-sm">
-                                ✅ Foto berhasil diambil! Anda bisa mengambil ulang atau lanjut mengisi form.
-                            </p>
+                        <div className="p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
+                            ✅ Foto berhasil diambil!
+                        </div>
+                    )}
+
+                    {/* Hint if no camera */}
+                    {!isStreamActive && !permissionDenied && !isCaptured && (
+                        <div className="text-center text-sm text-gray-500">
+                            Klik “Buka Kamera” untuk mulai mengambil gambar.
                         </div>
                     )}
                 </div>

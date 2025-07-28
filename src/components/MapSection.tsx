@@ -78,7 +78,7 @@ export default function MapSection({ stories, isOnline }: MapSectionProps) {
         <section className="maps-container my-6">
             {isOnline ? (
                 <div className='flex justify-center items-center'>
-                    <div className="flex h-[500px] w-[1500px] gap-4 rounded-xl overflow-hidden shadow-lg border-2 border-gray-600 relative z-0">
+                    <div className="flex h-[500px] w-[1500px] gap-4 rounded-xl overflow-hidden shadow-lg border-2 border-gray-200 relative z-0">
                         <MapContainer
                             center={[-6.2, 106.816]}
                             zoom={10}

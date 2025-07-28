@@ -25,6 +25,7 @@ export default function CreateStoryPage() {
     const [uploadProgress, setUploadProgress] = useState(0);
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const [capturedImage, setCapturedImage] = useState<File | null>(null);
+    const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
     const [isCameraActive, setIsCameraActive] = useState(false);
     const [selectedLocation, setSelectedLocation] = useState<{
         lat: number;
@@ -37,6 +38,7 @@ export default function CreateStoryPage() {
         defaultValues: {
             title: '',
             content: '',
+            image: null as unknown as File,
             latitude: undefined,
             longitude: undefined,
         },
@@ -51,7 +53,7 @@ export default function CreateStoryPage() {
             };
             reader.readAsDataURL(file);
             form.setValue('image', file);
-            setCapturedImage(null); // Clear captured image jika upload manual
+            setCapturedImage(null);
         }
     };
 
@@ -59,8 +61,13 @@ export default function CreateStoryPage() {
     const handleCameraCapture = (file: File, dataUrl: string) => {
         setCapturedImage(file);
         setPreviewImage(dataUrl);
-        form.setValue('image', file);
+        setImageSize({
+            width: 640,
+            height: 480,
+        });
+        form.setValue('image', file, { shouldValidate: true });
     };
+
 
     // Clear image
     const clearImage = () => {
@@ -73,8 +80,18 @@ export default function CreateStoryPage() {
         if (fileInput) fileInput.value = '';
     };
 
+
+
     // Handle form submission dengan progress tracking
     const onSubmit = async (data: CreateStoryFormData) => {
+
+        console.log("errors", form.formState.errors);
+        console.log("form data", data);
+
+        if (!(data.image instanceof File)) {
+            toast.error('File image tidak valid. Pastikan Anda memilih file yang benar.');
+            return;
+        }
         try {
             setIsSubmitting(true);
             setUploadProgress(0);
@@ -153,7 +170,7 @@ export default function CreateStoryPage() {
     }, [form]);
 
     return (
-        <div className="container mx-auto py-8 px-4 max-w-2xl">
+        <div className="container mx-auto py-8 px-4 mt-10 max-w-3xl">
             <Card>
                 <CardHeader>
                     <CardTitle className="text-2xl font-bold">📝 Tambah Story Baru</CardTitle>
@@ -186,7 +203,7 @@ export default function CreateStoryPage() {
                                         <FormLabel>Judul Story</FormLabel>
                                         <FormControl>
                                             <Input
-                                                placeholder="Masukkan judul yang menarik..."
+                                                placeholder="Masukkan judul yang anda inginkan..."
                                                 disabled={isSubmitting}
                                                 {...field}
                                             />
@@ -264,6 +281,8 @@ export default function CreateStoryPage() {
                                                         <Image
                                                             src={previewImage}
                                                             alt="Preview"
+                                                            width={imageSize?.width || 640}
+                                                            height={imageSize?.height || 480}
                                                             className="max-w-full h-48 object-cover rounded-lg border shadow-sm"
                                                         />
                                                         <Button
@@ -329,7 +348,7 @@ export default function CreateStoryPage() {
                             <div className="flex gap-4 pt-4 border-t">
                                 <Button
                                     type="button"
-                                    variant="outline"
+                                    variant="destructive"
                                     onClick={() => {
                                         // Clear draft on cancel
                                         sessionStorage.removeItem('story-draft');
@@ -343,6 +362,7 @@ export default function CreateStoryPage() {
 
                                 <Button
                                     type="submit"
+                                    variant="default"
                                     disabled={isSubmitting || !form.formState.isValid}
                                     className="flex-1"
                                 >

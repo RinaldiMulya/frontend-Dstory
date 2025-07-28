@@ -9,6 +9,7 @@ export const storiesApi = {
         try {
             const token = getToken();
             const response = await fetch(`${BASE_URL}/api/stories`, {
+
                 headers: { Authorization: `Bearer ${token}` },
             });
 
@@ -32,7 +33,7 @@ export const storiesApi = {
             // Sesuai dengan backend: title, content, latitude, longitude, file (image)
             formData.append("title", data.title);
             formData.append("content", data.content);
-            formData.append("image", data.image); // Backend menggunakan req.file untuk ini
+            formData.append("image", data.image);
 
             if (data.latitude !== undefined) {
                 formData.append("latitude", data.latitude.toString());
@@ -41,11 +42,15 @@ export const storiesApi = {
                 formData.append("longitude", data.longitude.toString());
             }
 
-            const response = await fetch(`${BASE_URL}/stories`, {
+            for (const [key, value] of formData.entries()) {
+                console.log(`apakah kuncinya benar ${key}:`, value);
+            }
+
+
+            const response = await fetch(`${BASE_URL}/api/stories`, {
                 method: "POST",
                 headers: {
                     Authorization: `Bearer ${token}`,
-                    // Jangan set Content-Type untuk FormData, browser akan set otomatis
                 },
                 body: formData,
             });
@@ -53,6 +58,7 @@ export const storiesApi = {
             const result = await response.json();
 
             if (!response.ok) {
+                console.error("Server response:", result);
                 throw new Error(
                     result.message || result.error || "Failed to create story"
                 );
@@ -69,7 +75,7 @@ export const storiesApi = {
     deleteStory: async (id: number): Promise<ApiResponse> => {
         try {
             const token = getToken();
-            const response = await fetch(`${BASE_URL}/stories/${id}`, {
+            const response = await fetch(`${BASE_URL}/api/stories/${id}`, {
                 method: "DELETE",
                 headers: {
                     Authorization: `Bearer ${token}`,
