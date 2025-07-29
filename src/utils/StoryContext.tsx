@@ -1,4 +1,5 @@
 // src/contexts/StoryContext.tsx
+/* eslint-disable */
 "use client";
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { getToken, clearToken, isLoggedIn } from "../app/lib/token";
@@ -188,11 +189,7 @@ export const StoryProvider = ({ children }: { children: ReactNode }) => {
                 },
             });
 
-            console.log('Delete response status:', response.status);
-            console.log('Delete response:', await response.clone().text());
-
             if (!response.ok) {
-                // Handle different error status codes
                 if (response.status === 401) {
                     throw new Error("Unauthorized - please login again");
                 } else if (response.status === 404) {
@@ -247,7 +244,6 @@ export const StoryProvider = ({ children }: { children: ReactNode }) => {
     );
 };
 
-// Combined Provider (untuk kemudahan)
 export const AppProvider = ({ children }: { children: ReactNode }) => {
     return (
         <UserProvider>

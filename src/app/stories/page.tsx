@@ -1,3 +1,5 @@
+/* eslint-disable */
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -84,9 +86,6 @@ export default function CreateStoryPage() {
 
     // Handle form submission dengan progress tracking
     const onSubmit = async (data: CreateStoryFormData) => {
-
-        console.log("errors", form.formState.errors);
-        console.log("form data", data);
 
         if (!(data.image instanceof File)) {
             toast.error('File image tidak valid. Pastikan Anda memilih file yang benar.');

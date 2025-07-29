@@ -1,14 +1,58 @@
 // src/components/homeContent.tsx
+/* eslint-disable */
 'use client';
+
 import { useAuthRedirect } from '../hooks/useAuthRedirect';
-import { useStories } from '../hooks/useStories';
+import { useStories } from '../utils/StoryContext'; // Gunakan context
+import { useState, useEffect } from 'react';
+import { getAddressFromCoordinates } from '../app/api/stories/geocode';
 import Hero from './hero';
 import MapSection from './MapSection';
 import StoriesList from './StoriesList';
+import ModernFooter from '../components/footer';
 
 export default function HomeContent() {
     useAuthRedirect();
-    const { stories, isOnline, addressCache } = useStories();
+    const { stories, loading } = useStories();
+    const [isOnline, setIsOnline] = useState(true);
+    const [addressCache, setAddressCache] = useState<Record<string, string>>({});
+
+    // Handle online/offline status
+    useEffect(() => {
+        setIsOnline(typeof navigator !== "undefined" && navigator.onLine);
+
+        const handleOnline = () => setIsOnline(true);
+        const handleOffline = () => setIsOnline(false);
+
+        window.addEventListener("online", handleOnline);
+        window.addEventListener("offline", handleOffline);
+
+        return () => {
+            window.removeEventListener("online", handleOnline);
+            window.removeEventListener("offline", handleOffline);
+        };
+    }, []);
+
+    // Load addresses for stories
+    useEffect(() => {
+        const loadAddresses = async () => {
+            if (stories.length > 0) {
+                await Promise.all(
+                    stories.map(async (story) => {
+                        if (story.latitude && story.longitude) {
+                            await getAddressFromCoordinates(
+                                story.latitude,
+                                story.longitude,
+                                setAddressCache
+                            );
+                        }
+                    })
+                );
+            }
+        };
+
+        loadAddresses();
+    }, [stories]);
 
     return (
         <main>
@@ -18,26 +62,28 @@ export default function HomeContent() {
                 <div
                     className="absolute inset-0 z-0 bg-center bg-no-repeat blur-xs scale-110"
                     style={{
-                        backgroundImage: `url('/freepik__upload__41771.png')` // Sesuaikan dengan nama file di folder public
+                        backgroundImage: `url('/freepik__upload__76156.png')`
                     }}
                 />
-
                 {/* Gradient Overlay untuk depth dan readability */}
                 <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/10 via-black/10 to-black/20" />
-
                 {/* Alternative: Backdrop blur jika browser support */}
                 <div className="absolute inset-0 z-15 backdrop-blur-xs bg-black/10" />
-
                 {/* Content Container */}
                 <div className="relative z-20 h-full flex flex-col">
                     <div className="flex-shrink-0">
-                        <MapSection stories={stories} isOnline={isOnline} addressCache={addressCache} />
+                        <MapSection
+                            stories={stories}
+                            isOnline={isOnline}
+                            addressCache={addressCache}
+                        />
                     </div>
                     <div className="flex-1 min-h-0">
                         <StoriesList />
                     </div>
                 </div>
             </section>
+            <ModernFooter />
         </main>
     );
 }

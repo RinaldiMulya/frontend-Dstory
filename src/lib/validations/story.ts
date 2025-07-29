@@ -42,10 +42,9 @@ export interface Story {
     };
 }
 
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
     message: string;
     story?: T;
     error?: string;
 }
-
 

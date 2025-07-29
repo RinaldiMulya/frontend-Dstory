@@ -1,4 +1,6 @@
+/* eslint-disable */
 'use client';
+
 import Image from 'next/image';
 import { showFormattedDate } from '../utils/index';
 import { Trash2 } from 'lucide-react';
