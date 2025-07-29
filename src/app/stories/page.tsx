@@ -16,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 
 import { createStorySchema, type CreateStoryFormData } from '@/lib/validations/story';
-import { storiesApi } from '../api/stories/route';
+import { storiesApi } from '../api/storiesApi';
 import LocationPicker from '@/components/LocationPicker';
 import CameraCapture from '@/components/CameraCapture';
 import Image from 'next/image';
