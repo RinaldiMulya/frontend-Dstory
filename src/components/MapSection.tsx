@@ -1,3 +1,4 @@
+// src/components/MapSection.tsx
 'use client';
 
 import dynamic from 'next/dynamic';
@@ -105,6 +106,5 @@ export default function MapSection({ stories, isOnline }: MapSectionProps) {
                 </div>
             )}
         </section>
-
     );
 }

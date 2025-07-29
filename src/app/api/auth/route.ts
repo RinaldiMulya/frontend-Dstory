@@ -1,6 +1,5 @@
 // src/app/api/auth/route.ts
 import { NextResponse } from "next/server";
-
 import { BASE_URL } from '../../../utils/config';
 
 export async function POST(request: Request) {

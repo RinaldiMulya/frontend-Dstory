@@ -3,13 +3,29 @@
 'use client';
 
 import { useAuthRedirect } from '../hooks/useAuthRedirect';
-import { useStories } from '../utils/StoryContext'; // Gunakan context
+import { useStories } from '../utils/StoryContext';
 import { useState, useEffect } from 'react';
-import { getAddressFromCoordinates } from '../app/api/stories/geocode';
 import Hero from './hero';
 import MapSection from './MapSection';
 import StoriesList from './StoriesList';
 import ModernFooter from '../components/footer';
+
+async function getAddressFromCoordinates(
+    lat: number,
+    lon: number,
+    setAddressCache: React.Dispatch<React.SetStateAction<Record<string, string>>>
+) {
+    const cacheKey = `${lat},${lon}`;
+    try {
+        const res = await fetch(`/api/geocode/reverse?lat=${lat}&lon=${lon}`);
+        const data = await res.json();
+        if (data.address) {
+            setAddressCache(prev => ({ ...prev, [cacheKey]: data.address }));
+        }
+    } catch (err) {
+        console.error('Gagal mendapatkan alamat:', err);
+    }
+}
 
 export default function HomeContent() {
     useAuthRedirect();
@@ -19,17 +35,17 @@ export default function HomeContent() {
 
     // Handle online/offline status
     useEffect(() => {
-        setIsOnline(typeof navigator !== "undefined" && navigator.onLine);
+        setIsOnline(typeof navigator !== 'undefined' && navigator.onLine);
 
         const handleOnline = () => setIsOnline(true);
         const handleOffline = () => setIsOnline(false);
 
-        window.addEventListener("online", handleOnline);
-        window.addEventListener("offline", handleOffline);
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
 
         return () => {
-            window.removeEventListener("online", handleOnline);
-            window.removeEventListener("offline", handleOffline);
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
         };
     }, []);
 
@@ -40,11 +56,14 @@ export default function HomeContent() {
                 await Promise.all(
                     stories.map(async (story) => {
                         if (story.latitude && story.longitude) {
-                            await getAddressFromCoordinates(
-                                story.latitude,
-                                story.longitude,
-                                setAddressCache
-                            );
+                            const cacheKey = `${story.latitude},${story.longitude}`;
+                            if (!addressCache[cacheKey]) {
+                                await getAddressFromCoordinates(
+                                    story.latitude,
+                                    story.longitude,
+                                    setAddressCache
+                                );
+                            }
                         }
                     })
                 );
@@ -57,7 +76,7 @@ export default function HomeContent() {
     return (
         <main>
             <Hero />
-            <section className='relative p-4 h-full overflow-hidden'>
+            <section className="relative p-4 h-full overflow-hidden">
                 {/* Background Image with Blur Effect */}
                 <div
                     className="absolute inset-0 z-0 bg-center bg-no-repeat blur-xs scale-110"
@@ -65,11 +84,11 @@ export default function HomeContent() {
                         backgroundImage: `url('/freepik__upload__76156.png')`
                     }}
                 />
-                {/* Gradient Overlay untuk depth dan readability */}
+                {/* Gradient Overlay */}
                 <div className="absolute inset-0 z-10 bg-gradient-to-b from-black/10 via-black/10 to-black/20" />
-                {/* Alternative: Backdrop blur jika browser support */}
                 <div className="absolute inset-0 z-15 backdrop-blur-xs bg-black/10" />
-                {/* Content Container */}
+
+                {/* Content */}
                 <div className="relative z-20 h-full flex flex-col">
                     <div className="flex-shrink-0">
                         <MapSection

@@ -1,3 +1,4 @@
+// src/components/footer.tsx
 /* eslint-disable */
 
 import React from 'react';

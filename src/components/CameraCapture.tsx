@@ -1,5 +1,6 @@
-'use client';
+// src/components/CameraCapture.tsx
 /* eslint-disable */
+'use client';
 
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';

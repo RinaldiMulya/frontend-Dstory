@@ -1,3 +1,5 @@
+// src/app/register/page.tsx
+
 'use client';
 import { useState, useEffect } from 'react';
 import { Eye, EyeOff, BookOpen, Sparkles, User, Lock, Mail, UserPlus } from 'lucide-react';

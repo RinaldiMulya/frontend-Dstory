@@ -143,13 +143,16 @@ export const StoryProvider = ({ children }: { children: ReactNode }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Fetch stories from API
     const fetchStories = async () => {
         try {
             setLoading(true);
             setError(null);
 
             const token = getToken();
+            if (!token) {
+                throw new Error("No authentication token");
+            }
+
             const response = await fetch(`${BASE_URL}/api/stories`, {
                 method: "GET",
                 headers: {
@@ -177,10 +180,18 @@ export const StoryProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    // Delete story via API
+    // FUNGSI DELETE YANG DIPERBAIKI
     const deleteStory = async (id: string): Promise<boolean> => {
         try {
+            setError(null);
             const token = getToken();
+
+            if (!token) {
+                throw new Error("No authentication token");
+            }
+
+            console.log(`Deleting story with ID: ${id}`);
+
             const response = await fetch(`${BASE_URL}/api/stories/${id}`, {
                 method: "DELETE",
                 headers: {
@@ -189,19 +200,36 @@ export const StoryProvider = ({ children }: { children: ReactNode }) => {
                 },
             });
 
+            console.log(`Delete response status: ${response.status}`);
+
             if (!response.ok) {
+                let errorMessage = `Failed to delete story (${response.status})`;
+
                 if (response.status === 401) {
-                    throw new Error("Unauthorized - please login again");
+                    clearToken();
+                    window.location.href = '/login';
+                    return false;
                 } else if (response.status === 404) {
-                    throw new Error("Story not found");
+                    errorMessage = "Story not found";
+                } else if (response.status === 403) {
+                    errorMessage = "You don't have permission to delete this story";
                 } else {
-                    const errorData = await response.json().catch(() => ({}));
-                    throw new Error(errorData.error || `Failed to delete story (${response.status})`);
+                    try {
+                        const errorData = await response.json();
+                        errorMessage = errorData.error || errorData.message || errorMessage;
+                    } catch {
+                        errorMessage = response.statusText || errorMessage;
+                    }
                 }
+
+                throw new Error(errorMessage);
             }
-            
+
+            // Jika sukses, hapus dari state lokal
             removeStory(id);
+            console.log(`Story ${id} deleted successfully`);
             return true;
+
         } catch (err) {
             console.error("Error deleting story:", err);
             setError(err instanceof Error ? err.message : "Failed to delete story");
@@ -209,17 +237,14 @@ export const StoryProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
-    // Add story to local state
     const addStory = (story: Story) => {
         setStories((prev) => [story, ...prev]);
     };
 
-    // Remove story from local state
     const removeStory = (id: string) => {
         setStories((prev) => prev.filter((s) => s.id !== id));
     };
 
-    // Auto-fetch stories when component mounts and user is logged in
     useEffect(() => {
         if (isLoggedIn()) {
             fetchStories();

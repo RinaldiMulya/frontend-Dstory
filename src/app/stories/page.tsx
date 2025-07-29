@@ -1,7 +1,7 @@
+// src\app\stories\page.tsx
 /* eslint-disable */
 
 'use client';
-
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -70,7 +70,6 @@ export default function CreateStoryPage() {
         form.setValue('image', file, { shouldValidate: true });
     };
 
-
     // Clear image
     const clearImage = () => {
         setPreviewImage(null);
@@ -82,37 +81,54 @@ export default function CreateStoryPage() {
         if (fileInput) fileInput.value = '';
     };
 
-
-
     // Handle form submission dengan progress tracking
     const onSubmit = async (data: CreateStoryFormData) => {
-
         if (!(data.image instanceof File)) {
             toast.error('File image tidak valid. Pastikan Anda memilih file yang benar.');
             return;
         }
+        
+        // Validasi tambahan untuk lokasi
+        if (selectedLocation) {
+            data.latitude = selectedLocation.lat;
+            data.longitude = selectedLocation.lng;
+        } else {
+            // Jika lokasi tidak dipilih, set ke undefined
+            data.latitude = undefined;
+            data.longitude = undefined;
+        }
+
         try {
             setIsSubmitting(true);
             setUploadProgress(0);
 
-            // Simulate upload progress (karena fetch tidak support progress native)
+            // Simulate upload progress
             const progressInterval = setInterval(() => {
                 setUploadProgress(prev => Math.min(prev + 10, 90));
             }, 200);
 
-            // Include location data if available
-            const submitData = {
-                ...data,
-                latitude: selectedLocation?.lat,
-                longitude: selectedLocation?.lng,
-            };
-
-            const result = await storiesApi.createStory(submitData);
+            const result = await storiesApi.createStory(data);
 
             clearInterval(progressInterval);
             setUploadProgress(100);
+            
+            // RESET FORM DAN STATE SETELAH BERHASIL
+            form.reset();
+            setPreviewImage(null);
+            setCapturedImage(null);
+            setSelectedLocation(null);
+            sessionStorage.removeItem('story-draft');
+            setImageSize(null);
 
-            toast.success('Story berhasil dibuat! 🎉');
+            // TAMBAHKAN FEEDBACK VISUAL LEBIH JELAS
+            toast.success('Story berhasil dibuat! 🎉', {
+                duration: 3000,
+                icon: '✅',
+                style: {
+                    border: '1px solid #4CAF50',
+                    padding: '16px',
+                }
+            });
 
             // Redirect setelah delay singkat
             setTimeout(() => {
@@ -124,7 +140,14 @@ export default function CreateStoryPage() {
             toast.error(
                 error instanceof Error
                     ? error.message
-                    : 'Gagal membuat story. Silakan coba lagi.'
+                    : 'Gagal membuat story. Silakan coba lagi.',
+                {
+                    duration: 4000,
+                    style: {
+                        border: '1px solid #FF5252',
+                        padding: '16px',
+                    }
+                }
             );
             setUploadProgress(0);
         } finally {
@@ -132,7 +155,7 @@ export default function CreateStoryPage() {
         }
     };
 
-    // Auto-save draft (optional feature)
+    // Auto-save draft
     useEffect(() => {
         const formData = form.watch();
         const draft = {
@@ -141,7 +164,7 @@ export default function CreateStoryPage() {
             timestamp: Date.now()
         };
 
-        // Save to sessionStorage (hanya jika ada content)
+        // Save to sessionStorage
         if (formData.title || formData.content) {
             sessionStorage.setItem('story-draft', JSON.stringify(draft));
         }
@@ -170,6 +193,16 @@ export default function CreateStoryPage() {
 
     return (
         <div className="container mx-auto py-8 px-4 mt-10 max-w-3xl">
+            {/* TAMBAHKAN FEEDBACK SUCCESS BANNER */}
+            {uploadProgress === 100 && (
+                <div className="mb-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded-lg flex items-center">
+                    <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <span>Story berhasil dibuat! anda dapat mengarahkan ke halaman stories...</span>
+                </div>
+            )}
+
             <Card>
                 <CardHeader>
                     <CardTitle className="text-2xl font-bold">📝 Tambah Story Baru</CardTitle>
@@ -282,7 +315,13 @@ export default function CreateStoryPage() {
                                                             alt="Preview"
                                                             width={imageSize?.width || 640}
                                                             height={imageSize?.height || 480}
-                                                            className="max-w-full h-48 object-cover rounded-lg border shadow-sm"
+                                                            className="max-w-full h-48 object-contain rounded-lg border shadow-sm bg-gray-50"
+                                                            onLoadingComplete={(img) => {
+                                                                setImageSize({
+                                                                    width: img.naturalWidth,
+                                                                    height: img.naturalHeight
+                                                                });
+                                                            }}
                                                         />
                                                         <Button
                                                             type="button"
@@ -362,8 +401,8 @@ export default function CreateStoryPage() {
                                 <Button
                                     type="submit"
                                     variant="default"
-                                    disabled={isSubmitting || !form.formState.isValid}
-                                    className="flex-1"
+                                    disabled={isSubmitting}
+                                    className="flex-1 bg-green-600 hover:bg-green-700"
                                 >
                                     {isSubmitting ? (
                                         <span className="flex items-center gap-2">
@@ -371,7 +410,12 @@ export default function CreateStoryPage() {
                                             Mengirim...
                                         </span>
                                     ) : (
-                                        '📤 Kirim Story'
+                                        <>
+                                            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                            </svg>
+                                            📤 Kirim Story
+                                        </>
                                     )}
                                 </Button>
                             </div>

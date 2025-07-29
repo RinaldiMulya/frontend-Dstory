@@ -1,3 +1,4 @@
+// src/lib/validations/story.ts
 import { z } from "zod";
 
 export const createStorySchema = z.object({

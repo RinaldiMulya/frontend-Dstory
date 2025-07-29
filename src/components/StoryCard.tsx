@@ -1,12 +1,11 @@
-/* eslint-disable */
+// src/components/StoryCard.tsx
 'use client';
 
-import Image from 'next/image';
-import { showFormattedDate } from '../utils/index';
-import { Trash2 } from 'lucide-react';
-import { useStories } from '../utils/StoryContext';
-import { getAddressFromCoordinates } from '../app/api/stories/geocode'; 
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
+import { Trash2 } from 'lucide-react';
+import { showFormattedDate } from '../utils/index';
+import { useStories } from '../utils/StoryContext';
 
 interface StoryCardProps {
     storyId: string;
@@ -14,45 +13,52 @@ interface StoryCardProps {
 
 export default function StoryCard({ storyId }: StoryCardProps) {
     const { stories, deleteStory } = useStories();
-    const story = stories.find(s => s.id === storyId);
-    const [addressCache, setAddressCache] = useState<Record<string, string>>({});
+    const story = stories.find((s) => s.id === storyId);
+
+    const [address, setAddress] = useState('');
     const [isDeleting, setIsDeleting] = useState(false);
 
-    const cacheKey = `${story?.latitude},${story?.longitude}`;
-    const address = addressCache[cacheKey];
-
     useEffect(() => {
-        if (story && !addressCache[cacheKey]) {
-            getAddressFromCoordinates(story.latitude, story.longitude, setAddressCache);
-        }
+        const fetchAddress = async () => {
+            if (!story) return;
+            try {
+                const res = await fetch(
+                    `/api/geocode/reverse?lat=${story.latitude}&lon=${story.longitude}`
+                );
+                const data = await res.json();
+                if (data.address) {
+                    setAddress(data.address);
+                }
+            } catch (error) {
+                console.error('Error fetching address:', error);
+            }
+        };
+
+        fetchAddress();
     }, [story]);
 
     if (!story) return null;
 
     const handleDelete = async () => {
-        if (isDeleting) return; // Prevent double-click
+        if (isDeleting) return;
+
+        const confirmed = window.confirm(
+            'Apakah Anda yakin ingin menghapus cerita ini?'
+        );
+        if (!confirmed) return;
 
         setIsDeleting(true);
-
-        // Optional: Add confirmation dialog
-        const confirmed = window.confirm("Apakah Anda yakin ingin menghapus cerita ini?");
-        if (!confirmed) {
-            setIsDeleting(false);
-            return;
-        }
-
-        const success = await deleteStory(story.id.toString()); // Pastikan id dalam format string
+        const success = await deleteStory(story.id.toString());
         setIsDeleting(false);
+
         if (success) {
-            // Optional: Show success message
-            console.log("Story deleted successfully");
+            console.log('Story deleted successfully');
         }
     };
 
-
     return (
         <div className="bg-[#1a1d29] rounded-2xl shadow-2xl overflow-hidden border border-white/10 backdrop-blur-sm transition-all transform hover:scale-[1.01] relative">
-            {/* Gambar atau Gradien */}
+            {/* Gambar */}
             <div className="h-48 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white text-sm font-medium">
                 {story.imageUrl ? (
                     <Image
@@ -69,9 +75,9 @@ export default function StoryCard({ storyId }: StoryCardProps) {
                 )}
             </div>
 
-            {/* Konten Utama */}
+            {/* Konten */}
             <div className="p-6 space-y-4 text-white">
-                {/* Info User */}
+                {/* User Info */}
                 <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-lg font-semibold">
                         {story.user.username.charAt(0).toUpperCase()}
@@ -83,12 +89,15 @@ export default function StoryCard({ storyId }: StoryCardProps) {
 
                 {/* Meta Info */}
                 <div className="bg-white/10 text-gray-300 p-4 rounded-lg text-sm space-y-2">
+                    {/* Tanggal */}
                     <div className="flex items-center gap-2">
                         <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" />
                         </svg>
                         <span>{showFormattedDate(story.createdAt, 'id-ID')}</span>
                     </div>
+
+                    {/* Lokasi */}
                     {address && (
                         <div className="flex items-center gap-2">
                             <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
@@ -104,7 +113,7 @@ export default function StoryCard({ storyId }: StoryCardProps) {
                     <span className="text-white">•</span> {story.content || 'Tidak ada deskripsi'}
                 </p>
 
-                {/* Aksi */}
+                {/* Tombol Aksi */}
                 <div className="flex justify-between items-center pt-2 border-t border-white/10">
                     <button className="px-5 py-2 mt-4 rounded-full text-white text-sm font-semibold bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-purple-500 hover:to-pink-500 transition-all flex items-center gap-2">
                         Selengkapnya →

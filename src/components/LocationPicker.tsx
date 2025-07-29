@@ -1,3 +1,4 @@
+// src/components/LocationPicker.tsx
 /* eslint-disable */
 
 'use client';
@@ -90,16 +91,14 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
     // Reverse geocoding untuk mendapatkan alamat
     const reverseGeocode = async (lat: number, lng: number) => {
         try {
-            const response = await fetch(
-                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
-            );
+            const response = await fetch(`/api/geocode/reverse?lat=${lat}&lon=${lng}`);
             const data = await response.json();
 
-            if (data.display_name) {
+            if (data.address) {
                 const locationWithAddress = {
                     lat: Number(lat.toFixed(6)),
                     lng: Number(lng.toFixed(6)),
-                    address: data.display_name
+                    address: data.address,
                 };
                 setCurrentLocation(locationWithAddress);
                 onLocationSelect(locationWithAddress);
@@ -108,6 +107,7 @@ export default function LocationPicker({ onLocationSelect, initialLocation }: Lo
             console.error('Error getting address:', error);
         }
     };
+    ;
 
     // Get current location menggunakan browser geolocation
     const getCurrentLocation = () => {

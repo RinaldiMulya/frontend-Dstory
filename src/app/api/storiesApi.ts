@@ -1,11 +1,11 @@
-// src/lib/api/stories.ts
-import { getToken } from '../lib/token';
-import { BASE_URL } from '../../utils/config';
+// src/app/api/storiesApi.ts
+import { getToken } from "../lib/token";
+import { BASE_URL } from "../../utils/config";
 import {
     CreateStoryFormData,
     Story,
     ApiResponse,
-} from '../../lib/validations/story';
+} from "../../lib/validations/story";
 
 export const storiesApi = {
     // Get all stories
@@ -13,10 +13,17 @@ export const storiesApi = {
         try {
             const token = getToken();
             const response = await fetch(`${BASE_URL}/api/stories`, {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
+                },
             });
 
-            if (!response.ok) throw new Error(`HTTP error! ${response.status}`);
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({}));
+                throw new Error(errorData.message || `HTTP error! ${response.status}`);
+            }
+
             const stories = await response.json();
             return stories;
         } catch (err) {
@@ -25,7 +32,7 @@ export const storiesApi = {
         }
     },
 
-    // Create new story - sesuai dengan backend controller
+    // Create new story
     createStory: async (
         data: CreateStoryFormData
     ): Promise<ApiResponse<Story>> => {
@@ -33,7 +40,6 @@ export const storiesApi = {
             const token = getToken();
             const formData = new FormData();
 
-            // Sesuai dengan backend: title, content, latitude, longitude, file (image)
             formData.append("title", data.title);
             formData.append("content", data.content);
             formData.append("image", data.image);
@@ -45,14 +51,11 @@ export const storiesApi = {
                 formData.append("longitude", data.longitude.toString());
             }
 
-            for (const [key, value] of formData.entries()) {
-                console.log(`apakah kuncinya benar ${key}:`, value);
-            }
-
             const response = await fetch(`${BASE_URL}/api/stories`, {
                 method: "POST",
                 headers: {
                     Authorization: `Bearer ${token}`,
+                    // Jangan set Content-Type untuk FormData, biarkan browser yang handle
                 },
                 body: formData,
             });
@@ -77,19 +80,42 @@ export const storiesApi = {
     deleteStory: async (id: number): Promise<ApiResponse> => {
         try {
             const token = getToken();
+
+            if (!token) {
+                throw new Error("No authentication token found");
+            }
+
+            console.log(`Attempting to delete story with ID: ${id}`);
+
             const response = await fetch(`${BASE_URL}/api/stories/${id}`, {
                 method: "DELETE",
                 headers: {
                     Authorization: `Bearer ${token}`,
+                    "Content-Type": "application/json",
                 },
             });
 
-            const result = await response.json();
             if (!response.ok) {
-                throw new Error(
-                    result.message || result.error || "Gagal menghapus story"
-                );
+                let errorMessage = `Failed to delete story (${response.status})`;
+
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.message || errorData.error || errorMessage;
+                } catch {
+                    // Jika response bukan JSON, gunakan status text
+                    errorMessage = response.statusText || errorMessage;
+                }
+
+                console.error("Delete request failed:", {
+                    status: response.status,
+                    statusText: response.statusText,
+                    url: response.url,
+                });
+
+                throw new Error(errorMessage);
             }
+
+            const result = await response.json();
             return result;
         } catch (err) {
             console.error("Failed to delete story:", err);
