@@ -9,6 +9,7 @@ import Hero from './hero';
 import MapSection from './MapSection';
 import StoriesList from './StoriesList';
 import ModernFooter from '../components/footer';
+import Header from "@/components/header";
 
 async function getAddressFromCoordinates(
     lat: number,
@@ -75,6 +76,7 @@ export default function HomeContent() {
 
     return (
         <main>
+            <Header />
             <Hero />
             <section className="relative p-4 h-full overflow-hidden">
                 {/* Background Image with Blur Effect */}

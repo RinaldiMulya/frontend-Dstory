@@ -222,6 +222,7 @@ export default function LoginPage() {
                             Belum punya akun?{" "}
                             <button
                                 type="button"
+                                onClick={() => router.push("/register")}
                                 className="text-blue-300 hover:text-white font-semibold underline decoration-2 underline-offset-2 hover:decoration-blue-300 transition-colors duration-200"
                                 disabled={isLoading}
                             >

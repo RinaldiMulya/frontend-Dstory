@@ -2,7 +2,6 @@
 import type { Metadata } from "next";
 import { Inter } from 'next/font/google';
 import "./globals.css";
-import Header from "@/components/header";
 import { AppProvider } from "@/utils/StoryContext";
 
 
@@ -27,7 +26,7 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
           <AppProvider>
-            <Header />
+      
             <a href="#main-content" className="sr-only">Lewati ke konten utama</a>
             {children}
           </AppProvider>

@@ -15,7 +15,8 @@ export async function GET(req: Request) {
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`,
             {
                 headers: {
-                    "User-Agent": "YourAppName/1.0 (email@example.com)",
+                    "User-Agent": "DstoryApp/1.0 (rinaldimulyatam@gmail.com)",
+                    'Accept-Language': 'id',
                 },
             }
         );

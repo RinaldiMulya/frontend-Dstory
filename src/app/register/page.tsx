@@ -223,7 +223,9 @@ export default function RegisterPage() {
                     <div className="mt-8 text-center">
                         <p className="text-teal-100 text-sm">
                             Sudah punya akun?{' '}
-                            <button className="text-teal-300 hover:text-white font-semibold underline decoration-2 underline-offset-2 hover:decoration-teal-300 transition-colors duration-200">
+                            <button
+                                onClick={() => window.location.href = "/login"}
+                                className="text-teal-300 hover:text-white font-semibold underline decoration-2 underline-offset-2 hover:decoration-teal-300 transition-colors duration-200">
                                 Masuk di sini
                             </button>
                         </p>
