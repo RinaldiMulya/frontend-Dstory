@@ -1,36 +1,92 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 📚 Story App – Platform Berbagi Cerita dengan Lokasi
 
-## Getting Started
+Story App adalah aplikasi web berbasis **Next.js + React + TypeScript** untuk berbagi cerita yang dilengkapi foto dan lokasi geografis. Pengguna dapat membuat cerita dengan judul, deskripsi, foto (upload atau dari kamera), dan lokasi di peta interaktif, lalu membagikannya ke publik.
 
-First, run the development server:
+> ⚠️ **Status Proyek:**  
+> Aplikasi ini sudah berfungsi dan mencakup sebagian besar fitur utama (~90% selesai), namun masih dalam tahap improvement dan refactoring. Anda bisa menggunakannya, tetapi beberapa kode dan fitur mungkin masih berubah pada rilis berikutnya.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## ✨ Fitur Utama
+
+- 🔐 **Autentikasi Pengguna** – Login & Registrasi dengan validasi
+- 📝 **Buat Cerita** – Judul, deskripsi, dan gambar (upload file atau ambil langsung via kamera)
+- 🗺️ **Lokasi Interaktif** – Pilih titik di peta atau gunakan lokasi saat ini
+- 📍 **Visualisasi Peta** – Semua cerita ditampilkan dalam peta Leaflet.js
+- 🎨 **UI Modern & Responsif** – Menggunakan Tailwind CSS & shadcn/ui
+- ⚡ **Optimasi Performa** – Lazy loading, React Context, dan auto-save draft
+
+## 🛠️ Tech Stack
+
+**Frontend:**
+- Next.js 15 (App Router)
+- React 19
+- TypeScript
+- Tailwind CSS + shadcn/ui
+- Leaflet.js
+- react-hook-form + Zod
+- react-hot-toast
+
+**Backend API:**
+- Endpoint: https://backend-dstory-production.up.railway.app
+
+## 📂 Struktur Proyek (Ringkas)
+
+```
+src/
+ ├── app/                # Halaman Next.js & API Routes
+ │   ├── api/             # Proxy API (Auth, Geocode, Stories)
+ │   ├── login/           # Halaman login
+ │   ├── register/        # Halaman registrasi
+ │   ├── stories/         # Halaman tambah cerita
+ │   └── page.tsx         # Landing page
+ │
+ ├── components/          # Komponen UI & fitur (Camera, Map, StoryCard, dll)
+ ├── lib/                 # Helper & validasi
+ ├── utils/               # Konfigurasi & Context API
+ └── styles/              # Global styles
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🚀 Cara Menjalankan
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 1. Clone repository
+```bash
+git clone https://github.com/username/story-app.git
+cd story-app
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 2. Install dependencies
+```bash
+npm install
+```
 
-## Learn More
+### 3. Buat file `.env.local`
+```env
+BASE_URL=https://backend-dstory-production.up.railway.app
+```
 
-To learn more about Next.js, take a look at the following resources:
+### 4. Jalankan aplikasi
+```bash
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 5. Buka di browser:
+```
+http://localhost:3000
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 📸 Screenshot
 
-## Deploy on Vercel
+| Halaman       | Preview                                       |
+| ------------- | --------------------------------------------- |
+| Landing Page  | ![LandingPage](https://github.com/user-attachments/assets/2dbda28a-45ed-40c3-b170-43fb2e43482e) |
+| Login         | ![Login](https://github.com/user-attachments/assets/3ff85204-9f7f-4da3-9ab8-b23a1f42ebdb) |
+| Register      | ![Register](https://github.com/user-attachments/assets/3f56d896-8e45-4e38-9b2b-41cd3ab6a7f3) |
+| Tambah Cerita | ![AddStory](https://github.com/user-attachments/assets/aa1b5f45-117c-46ad-ac76-e351dd585fc7) |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🗒️ Catatan Pengembangan
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [ ] Refactor kode untuk efisiensi & maintainability
+- [ ] Tambahkan fitur edit story & Detail Story
+- [ ] Tingkatkan validasi input & error handling
+- [ ] Implementasi infinite scroll di daftar story
+- [ ] Optimalisasi performa peta
+      
